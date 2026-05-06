@@ -1,5 +1,7 @@
 package com.ratelimiter.adaptive_rate_limiter.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import lombok.Builder;
 import lombok.Data;
 
@@ -7,6 +9,7 @@ import java.time.Instant;
 
 @Data
 @Builder
+@JsonDeserialize(builder = RateLimitRule.RateLimitRuleBuilder.class)
 public class RateLimitRule {
 
     private String id;
@@ -48,5 +51,9 @@ public class RateLimitRule {
                 .algorithm(Algorithm.TOKEN_BUCKET)
                 .description("Default rule for FREE tier clients")
                 .build();
+    }
+
+    @JsonPOJOBuilder(withPrefix = "")
+    public static class RateLimitRuleBuilder {
     }
 }

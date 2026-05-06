@@ -61,9 +61,9 @@ public class SlidingWindowRateLimiter implements RateLimiter {
                 return RateLimitResult.allow(limit, limit);
             }
 
-            long allowed      = result.get(0); // 1 = allowed, 0 = denied
-            long currentCount = result.get(1); // requests in current window
-            long retryAfter   = result.get(2); // seconds to wait if denied
+            long allowed      = ((Number) result.get(0)).longValue();
+            long currentCount = ((Number) result.get(1)).longValue();
+            long retryAfter   = ((Number) result.get(2)).longValue();
 
             if (allowed == 1L) {
                 long remaining = limit - currentCount;

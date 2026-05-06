@@ -23,7 +23,7 @@ public class RateLimitResult {
     }
     public static RateLimitResult deny(long retryAfterSeconds, long limit) {
         return RateLimitResult.builder()
-                .allowed(true)
+                .allowed(false)
                 .remaining(0)
                 .retryAfterSeconds(retryAfterSeconds)
                 .limit(limit)

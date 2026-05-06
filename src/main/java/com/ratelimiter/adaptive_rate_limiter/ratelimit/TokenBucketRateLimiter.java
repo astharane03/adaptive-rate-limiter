@@ -60,9 +60,9 @@ public class TokenBucketRateLimiter implements RateLimiter{
                 log.error("Token bucket Lua Script returned null/incomplete for key = {}", redisKey);
                 return RateLimitResult.allow(capacity,capacity);
             }
-            long allowed = result.get(0);
-            long remaining = result.get(1);
-            long retryAfter = result.get(2);
+            long allowed    = ((Number) result.get(0)).longValue();
+            long remaining  = ((Number) result.get(1)).longValue();
+            long retryAfter = ((Number) result.get(2)).longValue();
 
             if(allowed == 1L) {
                 log.debug("Token bucket ALLOWED key = {} remaining = {}", redisKey, remaining);
