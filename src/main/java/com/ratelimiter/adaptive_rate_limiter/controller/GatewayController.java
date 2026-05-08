@@ -4,6 +4,7 @@ import com.ratelimiter.adaptive_rate_limiter.config.GatewayProperties;
 import com.ratelimiter.adaptive_rate_limiter.filter.FilterChain;
 import com.ratelimiter.adaptive_rate_limiter.model.GatewayRequest;
 import com.ratelimiter.adaptive_rate_limiter.model.GatewayResponse;
+import com.ratelimiter.adaptive_rate_limiter.risk.ClientBehaviorTracker;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -40,11 +41,14 @@ public class GatewayController {
     private final FilterChain filterChain;
     private final WebClient webClient;
     private final GatewayProperties gatewayProperties;
+    private final ClientBehaviorTracker behaviorTracker;
 
     public GatewayController(FilterChain filterChain,
-                             GatewayProperties gatewayProperties) {
+                             GatewayProperties gatewayProperties,
+                             ClientBehaviorTracker behaviorTracker) {
         this.filterChain = filterChain;
         this.gatewayProperties = gatewayProperties;
+        this.behaviorTracker = behaviorTracker;
 
         // WebClient is the non-blocking HTTP client
         // We configure the base URL from application.properties
@@ -144,6 +148,7 @@ public class GatewayController {
 
         } catch (WebClientResponseException ex) {
             // Downstream returned 4xx or 5xx
+            behaviorTracker.recordError(resolveClientKey(httpRequest));
             log.error("Downstream error | status={} | body={}",
                     ex.getStatusCode(), ex.getResponseBodyAsString());
             return ResponseEntity
@@ -151,6 +156,7 @@ public class GatewayController {
                     .body(ex.getResponseBodyAsString());
 
         } catch (Exception ex) {
+            behaviorTracker.recordError(resolveClientKey(httpRequest));
             log.error("Failed to forward request: {}", ex.getMessage());
             return ResponseEntity
                     .status(HttpStatus.BAD_GATEWAY)
@@ -226,5 +232,12 @@ public class GatewayController {
             case 503 -> "Service Unavailable";
             default  -> "Unknown";
         };
+    }
+    private String resolveClientKey(HttpServletRequest httpRequest) {
+        Object identity = httpRequest.getAttribute("clientIdentity");
+        if (identity instanceof com.ratelimiter.adaptive_rate_limiter.model.ClientIdentity ci) {
+            return ci.getRateLimitKey();
+        }
+        return "ip:" + httpRequest.getRemoteAddr();
     }
 }
