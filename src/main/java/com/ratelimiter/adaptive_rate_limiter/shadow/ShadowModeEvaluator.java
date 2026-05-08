@@ -8,19 +8,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Decides whether to enforce a rate limit decision or
- * just log it (shadow mode).
+ * Two shadow mode scenarios:
  *
- * Called by RateLimitFilter after getting a result
- * from the rate limiter.
+ * Scenario A — per-rule shadow mode
+ *   A specific RateLimitRule has shadowMode=true.
+ *   Only that rule's blocks become log-only.
+ *   Called from RateLimitFilter after tryAcquire().
  *
- * Two inputs:
- *   rule     — contains shadowMode flag
- *   decision — the GatewayResponse the limiter produced
+ * Scenario B — global shadow mode
+ *   gateway.shadow-mode.enabled=true in application.properties.
+ *   ALL blocks from ALL filters become log-only.
+ *   Called from ShadowModeFilter.
  *
- * Two outputs:
- *   If rule.shadowMode = false → return decision as-is (enforce)
- *   If rule.shadowMode = true  → log + return allowed (don't enforce)
+ * Both scenarios use the same logger internally.
  */
 @Slf4j
 @Component
@@ -29,55 +29,49 @@ public class ShadowModeEvaluator {
 
     private final ShadowDecisionLogger shadowDecisionLogger;
 
+    /**
+     * Scenario A — per-rule.
+     * Called by RateLimitFilter.
+     * Checks rule.isShadowMode() to decide enforce vs log-only.
+     */
     public GatewayResponse evaluate(GatewayRequest request,
                                     GatewayResponse decision,
                                     RateLimitRule rule) {
 
-        // Rule is not in shadow mode — enforce normally
+        // Rule not in shadow mode — enforce normally
         if (!rule.isShadowMode()) {
             return decision;
         }
 
-        // Rule IS in shadow mode
-        // If the decision was to allow — nothing special, just allow
+        // Rule IS in shadow mode but request was allowed anyway
+        // Nothing to override — just return allowed
         if (decision.isAllowed()) {
             return decision;
         }
 
-        // Decision was to BLOCK but shadow mode is on
-        // Log what would have happened, but let the request through
+        // Rule IS in shadow mode AND decision was to block
+        // Log it but let the request through
         shadowDecisionLogger.logWouldHaveBlocked(request, decision);
-
-        log.info("[SHADOW] Overriding block → allowing | " +
-                        "client={} | path={}",
-                resolveClientKey(request),
-                request.getPath());
-
         return GatewayResponse.allowed();
     }
 
     /**
-     * Global shadow mode check — used by ShadowModeFilter.
-     * If globally enabled, ALL blocking decisions become log-only.
+     * Scenario B — global.
+     * Called by ShadowModeFilter.
+     * Receives a decision that already came out of RateLimitFilter.
+     * If that decision was a block → override to allow + log.
      */
     public GatewayResponse evaluateGlobal(GatewayRequest request,
-                                          GatewayResponse decision,
-                                          boolean globalShadowEnabled) {
-        if (!globalShadowEnabled || decision.isAllowed()) {
+                                          GatewayResponse decision) {
+
+        // Request was allowed — nothing to override
+        if (decision.isAllowed()) {
             return decision;
         }
 
+        // Decision was block + global shadow is on
+        // Log and let through
         shadowDecisionLogger.logWouldHaveBlocked(request, decision);
         return GatewayResponse.allowed();
-    }
-
-    private String resolveClientKey(GatewayRequest request) {
-        Object identity = request.getRawRequest()
-                .getAttribute("clientIdentity");
-        if (identity instanceof
-                com.ratelimiter.adaptive_rate_limiter.model.ClientIdentity ci) {
-            return ci.getRateLimitKey();
-        }
-        return "ip:" + request.getRemoteIp();
     }
 }

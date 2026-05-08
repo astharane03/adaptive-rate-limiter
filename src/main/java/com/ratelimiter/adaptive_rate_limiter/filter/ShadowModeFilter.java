@@ -10,14 +10,17 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Runs fourth in the chain (@Order 4).
+ * Global shadow mode gate.
+ * Runs last in chain @Order(4).
  *
- * Shadow mode = evaluate rules but never actually block.
- * Used when you want to test a new rule safely in production
- * without affecting real users.
+ * Only activates when gateway.shadow-mode.enabled=true.
  *
- * Full implementation comes in Phase 6 when we wire in
- * ShadowModeEvaluator. For now this is a pass-through.
+ * Reads the rate limit decision stored by RateLimitFilter.
+ * If that decision was a block → evaluateGlobal overrides
+ * it to allow + logs it.
+ *
+ * If decision was already allowed → does nothing.
+ * If global shadow mode is off   → does nothing.
  */
 @Slf4j
 @Component
@@ -25,26 +28,31 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ShadowModeFilter implements GatewayFilter {
 
-    private final GatewayProperties gatewayProperties;
+    private final GatewayProperties   gatewayProperties;
     private final ShadowModeEvaluator shadowModeEvaluator;
 
     @Override
     public GatewayResponse filter(GatewayRequest request) {
-        boolean globalShadow = gatewayProperties.getShadowMode().isEnabled();
 
-        if (!globalShadow) {
-            // Shadow mode off globally — nothing to do
+        // Global shadow mode off — do nothing
+        if (!gatewayProperties.getShadowMode().isEnabled()) {
             return GatewayResponse.allowed();
         }
 
-        // Global shadow mode is ON
-        // Previous filters already ran and made their decisions.
-        // We can't retroactively change them here — but we log
-        // the intent and let everything through.
-        log.debug("[SHADOW] Global shadow mode active | path={}",
-                request.getPath());
+        // Read the decision RateLimitFilter stored
+        GatewayResponse storedDecision = (GatewayResponse) request
+                .getRawRequest()
+                .getAttribute("rateLimitDecision");
 
-        return GatewayResponse.allowed();
+        // RateLimitFilter didn't run or stored null — allow
+        if (storedDecision == null) {
+            return GatewayResponse.allowed();
+        }
+
+        // Pass to evaluateGlobal:
+        //   allowed decision → returns allowed, nothing logged
+        //   blocked decision → logs + returns allowed
+        return shadowModeEvaluator.evaluateGlobal(request, storedDecision);
     }
 
     @Override

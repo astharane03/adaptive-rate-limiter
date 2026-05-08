@@ -2,6 +2,7 @@ package com.ratelimiter.adaptive_rate_limiter.controller;
 
 import com.ratelimiter.adaptive_rate_limiter.config.GatewayProperties;
 import com.ratelimiter.adaptive_rate_limiter.filter.FilterChain;
+import com.ratelimiter.adaptive_rate_limiter.metrics.RateLimiterMetrics;
 import com.ratelimiter.adaptive_rate_limiter.model.GatewayRequest;
 import com.ratelimiter.adaptive_rate_limiter.model.GatewayResponse;
 import com.ratelimiter.adaptive_rate_limiter.risk.ClientBehaviorTracker;
@@ -42,16 +43,16 @@ public class GatewayController {
     private final WebClient webClient;
     private final GatewayProperties gatewayProperties;
     private final ClientBehaviorTracker behaviorTracker;
+    private final RateLimiterMetrics metrics;
 
     public GatewayController(FilterChain filterChain,
                              GatewayProperties gatewayProperties,
-                             ClientBehaviorTracker behaviorTracker) {
+                             ClientBehaviorTracker behaviorTracker,
+                             RateLimiterMetrics metrics) {
         this.filterChain = filterChain;
         this.gatewayProperties = gatewayProperties;
         this.behaviorTracker = behaviorTracker;
-
-        // WebClient is the non-blocking HTTP client
-        // We configure the base URL from application.properties
+        this.metrics = metrics;
         this.webClient = WebClient.builder()
                 .baseUrl(gatewayProperties.getDownstream().getBaseUrl())
                 .build();
@@ -149,6 +150,7 @@ public class GatewayController {
         } catch (WebClientResponseException ex) {
             // Downstream returned 4xx or 5xx
             behaviorTracker.recordError(resolveClientKey(httpRequest));
+            metrics.recordDownstreamError(resolveClientKey(httpRequest));
             log.error("Downstream error | status={} | body={}",
                     ex.getStatusCode(), ex.getResponseBodyAsString());
             return ResponseEntity
@@ -157,6 +159,7 @@ public class GatewayController {
 
         } catch (Exception ex) {
             behaviorTracker.recordError(resolveClientKey(httpRequest));
+            metrics.recordDownstreamError(resolveClientKey(httpRequest));
             log.error("Failed to forward request: {}", ex.getMessage());
             return ResponseEntity
                     .status(HttpStatus.BAD_GATEWAY)

@@ -32,6 +32,7 @@ import java.util.List;
 public class TokenBucketRateLimiter implements RateLimiter{
 
     private final RedisTemplate<String, String> redisTemplate;
+    @SuppressWarnings("rawtypes")
     private final DefaultRedisScript<List> tokenBucketScript;
 
     private static final String KEY_PREFIX = "rl:tb:";

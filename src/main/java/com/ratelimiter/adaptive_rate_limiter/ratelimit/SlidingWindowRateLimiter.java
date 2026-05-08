@@ -32,6 +32,7 @@ import java.util.List;
 public class SlidingWindowRateLimiter implements RateLimiter {
 
     private final RedisTemplate<String, String> redisTemplate;
+    @SuppressWarnings("rawtypes")
     private final DefaultRedisScript<List> slidingWindowScript;
 
     private static final String KEY_PREFIX = "rl:sw:";
