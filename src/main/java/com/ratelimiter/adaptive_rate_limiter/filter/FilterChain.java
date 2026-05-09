@@ -1,5 +1,6 @@
 package com.ratelimiter.adaptive_rate_limiter.filter;
 
+import com.ratelimiter.adaptive_rate_limiter.model.ClientIdentity;
 import com.ratelimiter.adaptive_rate_limiter.model.GatewayRequest;
 import com.ratelimiter.adaptive_rate_limiter.model.GatewayResponse;
 import lombok.RequiredArgsConstructor;
@@ -47,8 +48,9 @@ public class FilterChain {
     }
 
     private String resolveClientKey(GatewayRequest request) {
-        if (request.getClientIdentity() != null) {
-            return request.getClientIdentity().getRateLimitKey();
+        Object identity = request.getRawRequest().getAttribute("clientIdentity");
+        if (identity instanceof ClientIdentity ci) {
+            return ci.getRateLimitKey();
         }
         return request.getRemoteIp();
     }

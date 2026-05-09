@@ -299,8 +299,15 @@ public class RateLimitFilter implements GatewayFilter {
 
         request.getRawRequest().setAttribute("rateLimitDecision", decision);
 
+        // Step 8 — per-rule shadow mode
+        GatewayResponse finalDecision = shadowModeEvaluator.evaluate(request, decision, rule);
 
-        return shadowModeEvaluator.evaluate(request, decision, rule);
+        // Step 9 — global shadow mode
+        if (gatewayProperties.getShadowMode().isEnabled()) {
+            return shadowModeEvaluator.evaluateGlobal(request, finalDecision);
+        }
+
+        return finalDecision;
     }
 
     @Override
