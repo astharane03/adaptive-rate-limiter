@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: rate-limiter
+  labels:
+    app: redis
+spec:
+  replicas: 1      # Redis is stateful — only ever 1 replica
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.2-alpine
+          ports:
+            - containerPort: 6379
+          command:
+            - redis-server
+            - --maxmemory
+            - 256mb
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          # Kubernetes checks this to know if Redis is ready
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+# Service gives Redis a stable DNS name inside the cluster
+# Any pod can reach Redis at "redis-service:6379"
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: rate-limiter
+spec:
+  selector:
+    app: redis        # routes traffic to pods with label app=redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+  type: ClusterIP     # only accessible inside the cluster, not from outside

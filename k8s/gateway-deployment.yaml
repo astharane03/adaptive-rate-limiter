@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: rate-limiter
+  labels:
+    app: gateway
+spec:
+  replicas: 3      # start with 3 pods
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+      annotations:
+        # Prometheus auto-discovers pods with these annotations
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+        - name: gateway
+          # Use minikube's local Docker registry
+          # We build the image into minikube directly
+          image: adaptive-rate-limiter:latest
+          imagePullPolicy: Never   # don't try to pull from DockerHub
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: actuator
+              containerPort: 8081
+          # Inject Redis host from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: gateway-config
+          # Resource limits — HPA uses CPU % of these limits
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          # readinessProbe — when is pod ready to receive traffic?
+          # Kubernetes won't send requests until /actuator/health returns 200
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 30   # Spring Boot needs time to start
+            periodSeconds: 10
+            failureThreshold: 3
+          # livenessProbe — is pod still alive?
+          # If this fails 3 times, Kubernetes restarts the pod
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          # Graceful shutdown — finish in-flight requests before stopping
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]
+      # Wait up to 60s for pods to terminate gracefully
+      terminationGracePeriodSeconds: 60

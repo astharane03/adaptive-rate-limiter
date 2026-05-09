@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: rate-limiter
+  labels:
+    app: gateway
+spec:
+  selector:
+    app: gateway       # sends traffic to all pods labeled app=gateway
+  ports:
+    - name: http
+      port: 80         # service listens on port 80
+      targetPort: 8080 # forwards to pod's port 8080
+      nodePort: 30080  # exposed on your Mac at localhost:30080 via minikube
+    - name: actuator
+      port: 8081
+      targetPort: 8081
+      nodePort: 30081
+  type: NodePort       # exposes service outside the cluster via minikube

@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s       # scrape every 5 seconds
+  evaluation_interval: 5s
+
+scrape_configs:
+
+  - job_name: 'adaptive-rate-limiter'
+    metrics_path: '/actuator/prometheus'
+    # host.docker.internal = your Mac's localhost from inside the container
+    # Your Spring Boot app runs on port 8081 (management port)
+    static_configs:
+      - targets: ['host.docker.internal:8081']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'gateway'

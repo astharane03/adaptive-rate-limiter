@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: rate-limiter
+data:
+  # These override application.properties values
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  DOWNSTREAM_BASE_URL: "http://mock-downstream:9090"
+  SPRING_PROFILES_ACTIVE: "local"
+
+  # Embed full application.properties for Kubernetes environment
+  application.properties: |
+    server.port=8080
+    server.shutdown=graceful
+    spring.application.name=adaptive-rate-limiter
+
+    spring.data.redis.host=${REDIS_HOST:redis-service}
+    spring.data.redis.port=${REDIS_PORT:6379}
+    spring.data.redis.timeout=2000ms
+    spring.data.redis.lettuce.pool.max-active=16
+    spring.data.redis.lettuce.pool.max-idle=8
+    spring.data.redis.lettuce.pool.min-idle=2
+    spring.data.redis.lettuce.pool.max-wait=1000ms
+
+    management.server.port=8081
+    management.endpoints.web.exposure.include=health,info,prometheus,metrics
+    management.endpoint.health.show-details=always
+    management.endpoint.prometheus.enabled=true
+    management.metrics.tags.application=${spring.application.name}
+
+    gateway.downstream.base-url=${DOWNSTREAM_BASE_URL:http://localhost:9090}
+    gateway.downstream.connect-timeout-ms=2000
+    gateway.downstream.read-timeout-ms=5000
+    gateway.default-rules.requests-per-minute=60
+    gateway.default-rules.burst-capacity=10
+    gateway.default-rules.algorithm=TOKEN_BUCKET
+    gateway.shadow-mode.enabled=false
+    gateway.shadow-mode.log-prefix=[SHADOW]
+
+    resilience4j.circuitbreaker.instances.downstream.failure-rate-threshold=50
+    resilience4j.circuitbreaker.instances.downstream.minimum-number-of-calls=10
+    resilience4j.circuitbreaker.instances.downstream.wait-duration-in-open-state=30s
+    resilience4j.circuitbreaker.instances.downstream.permitted-number-of-calls-in-half-open-state=5
+    resilience4j.circuitbreaker.instances.downstream.sliding-window-type=COUNT_BASED
+    resilience4j.circuitbreaker.instances.downstream.sliding-window-size=20
+    resilience4j.circuitbreaker.instances.downstream.register-health-indicator=true
+
+    logging.level.root=INFO
+    logging.level.com.ratelimiter.adaptive_rate_limiter=DEBUG
+    logging.level.io.lettuce=WARN

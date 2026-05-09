@@ -82,6 +82,8 @@ public class RateLimiterMetrics {
         Timer.builder("rate_limit_check_duration_seconds")
                 .tag("client", sanitize(clientKey))
                 .description("Time taken for rate limit check in Redis")
+                .publishPercentileHistogram()   // ← enables _bucket metrics
+                .publishPercentiles(0.5, 0.95, 0.99)  // ← enables p50/p95/p99
                 .register(meterRegistry)
                 .record(durationNanos, TimeUnit.NANOSECONDS);
     }

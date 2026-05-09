@@ -186,10 +186,32 @@
 			<version>4.12.0</version>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>io.gatling.highcharts</groupId>
+			<artifactId>gatling-charts-highcharts</artifactId>
+			<version>3.10.3</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>net.alchim31.maven</groupId>
+				<artifactId>scala-maven-plugin</artifactId>
+				<version>4.9.2</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>testCompile</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<scalaVersion>2.13.12</scalaVersion>
+				</configuration>
+			</plugin>
 
 			<!-- Spring Boot Maven Plugin — builds the fat JAR -->
 			<plugin>
@@ -246,6 +268,18 @@
 					</includes>
 				</configuration>
 			</plugin>
+
+			<!-- Gatling Maven Plugin -->
+			<plugin>
+				<groupId>io.gatling</groupId>
+				<artifactId>gatling-maven-plugin</artifactId>
+				<version>4.9.0</version>
+				<configuration>
+					<simulationClass>simulations.RateLimiterSimulation</simulationClass>
+
+				</configuration>
+			</plugin>
+
 		</plugins>
 	</build>
 
